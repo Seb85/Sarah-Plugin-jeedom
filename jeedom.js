@@ -1,4 +1,3 @@
-
 /* This file is part of Jeedom.
  *
  * Jeedom is free software: you can redistribute it and/or modify
@@ -26,6 +25,7 @@ exports.action = function (data, callback, config, SARAH) {
     /************************************************************************************************
      ** Path list
      ************************************************************************************************/
+    var pathXml = 'plugins/jeedom/jeedom.xml';
     var pathJeedomApi = '/core/api/jeeApi.php';
 
     /************************************************************************************************
@@ -60,6 +60,17 @@ exports.action = function (data, callback, config, SARAH) {
             jsonrpc.params[i] = data[i];
         }
         sendJsonRequest(jsonrpc, readReturn);
+    });
+
+    /***************************************************
+     ** @description Update interaction xml file
+     ** @function update
+     ***************************************************/
+    jeedomProcess.on('update', function () {
+        console.log('--------UPDATE--------');
+        var jsonrpc = getJsonRpc();
+        jsonrpc.method = 'updateXml';
+        sendJsonRequest(jsonrpc, updateXml);
     });
 	
 	/***************************************************
@@ -130,10 +141,62 @@ exports.action = function (data, callback, config, SARAH) {
         var jsonrpc = {};
         jsonrpc.id = data.id;
         jsonrpc.params = {};
-        jsonrpc.params.apikey = Config.modules.jeedom.apikeyJeedom;
+        jsonrpc.params.apikey = config.apikeyJeedom;
         jsonrpc.params.plugin = 'sarah';
         jsonrpc.jsonrpc = '2.0';
         return jsonrpc;
+    }
+
+    /***************************************************
+     ** @description Update xml file from jeedom
+     ** @function updateXml
+     ** @param file _xml
+     ***************************************************/
+    function updateXml(_xml) {
+        console.log('Ecriture du fichier xml');
+        var fs = require('fs');
+        fs.writeFile(pathXml, _xml, function (err) {
+            if (err) {
+                console.log('ERREUR Sarah: Update du fichier jeedom.xml impossible');
+            } else {
+                callbackReturn.emit('tts', _xml);
+                console.log('Mise à jour du xml réussi');
+            }
+        });
+    }
+
+    /***************************************************
+     ** @description Update xml file from jeedom
+     ** @function readReturn
+     ** @param string _return
+     ***************************************************/
+    function readReturn(_return) {
+        callbackReturn.emit('tts', _return);
+    }
+
+    /***************************************************
+     ** @description Update xml file from jeedom
+     ** @function ProcessReturn
+     ** @param string or object _return
+     ** @param function intCallback
+     ** @return ?
+     ***************************************************/
+    function checkReturn(_return, callback) {
+        if (_return === false) {
+            console.log('Echec de la requete à jeedom');
+            return false;
+        }
+        if (isset(_return.error)) {
+            if (isset(_return.error.message)) {
+                console.log(_return.error.message);
+				callbackReturn.emit('tts', _return.error.message);
+            } else {
+                console.log('Echec de la requete à jeedom (no return message');
+				callbackReturn.emit('tts', 'Echec de la requete à jeedom (no return message');
+            }
+			return false;
+        } 
+		return _return['result'];
     }
 
     /***************************************************
@@ -163,14 +226,14 @@ exports.action = function (data, callback, config, SARAH) {
      ** Main
      ************************************************************************************************/
     console.log('Plugin "jeedom" for Sarah starting');
-    config = Config.modules.jeedom;
+    config = config.modules.jeedom;
 	if (!config.apikeyJeedom){
 		console.log("Clef api manquante");
 		callback({'tts' : 'Clef api manquante'});
 		return;
 	}
 	console.log(data);
-	if(data.method == 'execute'){
+	if(data.method == 'execute' || data.method == 'ask' || data.method == 'update'){
 		jeedomProcess.emit(data.method);
 	}else{
 		callback();
